@@ -50,21 +50,23 @@ get_teams <- function(league, season, progress = TRUE, ...) {
   mydata <- tidyr::crossing(leagues, seasons)
   print(mydata)
 
-  if (exists("progress") && progress) {
+  ## TODO: fix progress bar
+  # if (progress) {
 
-    pb <- progress::progress_bar$new(format = "get_teams() [:bar] :percent ETA: :eta",
-                                     clear = FALSE, total = nrow(mydata), show_after = 0)
-    cat("\n")
+  #   pb <- progress::progress_bar$new(format = "get_teams() [:bar] :percent ETA: :eta",
+  #                                    clear = FALSE, total = nrow(mydata), show_after = 0)
+  #   cat("\n")
 
-    pb$tick(0)
-  }
+  #   pb$tick(0)
+  # }
 
   insistently_fetch_league_teams <- purrr::insistently(fetch_league_teams,
                                                        rate = purrr::rate_backoff(pause_base = 0.1, max_times = 5))
 
   try_fetch_teams <- function(league, season, ...) {
 
-    tryCatch(insistently_fetch_league_teams(league, season, ...),
+    # tryCatch(insistently_fetch_league_teams(league, season, ...),
+    tryCatch(fetch_league_teams(league, season, ...),
 
       error = function(e) {
         cat("\n\nThere's an error:\n\n", sep = "")
@@ -143,7 +145,11 @@ fetch_league_teams <- function(league, season, ...) {
 
   ## temporary?
   teams_df <- teams_df %>%
-    dplyr::select(team, team_url = team_stats_url, league, season)
+    dplyr::select(team, team_url = team_stats_url, league, season, team_id, season_slug)
+
+  # if (progress) {
+  #   pb$tick()
+  # }
 
   return(teams_df)
 }
@@ -225,9 +231,9 @@ z_fetch_league_teams <- function(league, season = get_current_year(), ...) {
     dplyr::mutate(league = league_name) %>%
     dplyr::mutate(season = season)
 
-  if (exists("progress") && progress && exists("pb")) {
-    pb$tick()
-  }
+  # if (exists("progress") && progress && exists("pb")) {
+  #   pb$tick()
+  # }
 
   return(all_data)
 
