@@ -37,10 +37,10 @@ get_player_stats_team <- function(..., progress = FALSE) {
   # get_player_stats_team_insist <- purrr::insistently(fetch_player_stats_team,
   #                                                    rate = purrr::rate_backoff(pause_base = 0.1, max_times = 5))
 
-  get_team_player_stats <- function(team, team_url, league, season, team_id, season_slug, ...) {
+  get_team_player_stats <- function(team, ep_team_url, league, season, ep_team_id, season_slug, ...) {
 
     # TODO: use insistently and purrr::possibly() to retry on failure
-    tryCatch(fetch_player_stats_team(team, team_url, league, season, team_id, season_slug, ...),
+    tryCatch(fetch_player_stats_team(team, ep_team_url, league, season, ep_team_id, season_slug, ...),
 
       error = function(e) {
         cat("\n\nThere's an error:\n\n", sep = "")
@@ -48,7 +48,7 @@ get_player_stats_team <- function(..., progress = FALSE) {
         cat("\nHere's where it's from:\n\nTeam:\t", team,
             "\nLeague:\t", league,
             "\nSeason:\t", season,
-            "\nURL:\t", team_url,
+            "\nURL:\t", ep_team_url,
             sep = "")
         cat("\n")
         tibble::tibble()
@@ -60,7 +60,7 @@ get_player_stats_team <- function(..., progress = FALSE) {
         cat("\nHere's where it's from:\n\nTeam:\t", team,
             "\nLeague:\t", league,
             "\nSeason:\t", season,
-            "\nURL:\t", team_url,
+            "\nURL:\t", ep_team_url,
             sep = "")
         cat("\n")
         tibble::tibble()
@@ -79,9 +79,9 @@ get_player_stats_team <- function(..., progress = FALSE) {
 }
 
 
-fetch_player_stats_team <- function(team, team_url, league, season, team_id, season_slug, ...) {
+fetch_player_stats_team <- function(team, ep_team_url, league, season, ep_team_id, season_slug, ...) {
 
-  team_player_stats_page <- fetch_team_player_stats_page(team_id, season_slug)
+  team_player_stats_page <- fetch_team_player_stats_page(ep_team_id, season_slug)
   skater_stats <- parse_skater_stats(team_player_stats_page)
   goalie_stats <- parse_goalie_stats(team_player_stats_page)
 
@@ -89,7 +89,7 @@ fetch_player_stats_team <- function(team, team_url, league, season, team_id, sea
     dplyr::select(!starts_with("ep_"), ep_player_id, ep_player_slug, ep_player_url) %>%
     dplyr::mutate(team = team,
                   season = season,
-                  team_url = team_url) %>%
+                  ep_team_url = ep_team_url) %>%
     dplyr::mutate(dplyr::across(games_played:save_percentage_playoffs, as_numeric_quietly)) %>%
     dplyr::select(name, team, league, season, dplyr::everything())
 
@@ -100,19 +100,19 @@ fetch_player_stats_team <- function(team, team_url, league, season, team_id, sea
 #' @title Fetch team player stats page
 #' @description Fetches a team player stats page from Elite Prospects. Caches the results to disk by default
 #'
-#' @param team_id The team's Elite Prospects ID
+#' @param ep_team_id The team's Elite Prospects ID
 #' @param season_slug The season slug
 #'
 #' @return A team player stats page as html text
-fetch_team_player_stats_page <- function(team_id, season_slug, ...) {
+fetch_team_player_stats_page <- function(ep_team_id, season_slug, ...) {
 
-  .get_page <- function(team_id, season_slug) {
+  .get_page <- function(ep_team_id, season_slug) {
 
     agent <- "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36" #nolint
     accept_header <- "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7" #nolint
     page_gotten <- httr::GET(
       "https://www.eliteprospects.com/ajax/team.player-stats",
-      query = list(teamId = team_id, season = season_slug),
+      query = list(teamId = ep_team_id, season = season_slug),
       httr::user_agent(agent),
       httr::content_type("text/html"),
       httr::add_headers(
@@ -140,7 +140,7 @@ fetch_team_player_stats_page <- function(team_id, season_slug, ...) {
                                 cache = cachem::cache_disk(max_age = 3600))
 
 
-  page <- httr::content(mget_page(team_id, season_slug),
+  page <- httr::content(mget_page(ep_team_id, season_slug),
                         as = "text", type = "text/html", encoding = "UTF-8")
 
   # page <- httr::content(.get_page(team_id, season_slug),

@@ -145,7 +145,7 @@ fetch_league_teams <- function(league, season, ...) {
 
   ## temporary?
   teams_df <- teams_df %>%
-    dplyr::select(team, team_url = team_stats_url, league, season, team_id, season_slug)
+    dplyr::select(team, ep_team_url = team_stats_url, league, season, ep_team_id =  team_id, season_slug)
 
   # if (progress) {
   #   pb$tick()
