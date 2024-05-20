@@ -96,7 +96,6 @@ fetch_player_stats_team <- function(team, ep_team_url, league, season, ep_team_i
   return(dataframe)
 }
 
-# roxygen2 documentation for fetch_team_player_stats_page
 #' @title Fetch team player stats page
 #' @description Fetches a team player stats page from Elite Prospects. Caches the results to disk by default
 #'
