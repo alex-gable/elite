@@ -170,7 +170,7 @@ z_fetch_league_teams <- function(league, season = get_current_year(), ...) {
   memoised_read_html <- memoise::memoise(xml2::read_html)
 
   page_url <- stringr::str_c("https://www.eliteprospects.com/league/", league, "/", season)
-  print(paste0("\n",page_url))
+  print(paste0("\n", page_url))
 
   page <- memoised_read_html(page_url)
 
