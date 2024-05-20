@@ -13,9 +13,10 @@
 #' get_years_difference("1995-10-22", "2018-08-27")
 #'
 #' @export
-#' @import dplyr
 #'
 get_years_difference <- function(from, to) {
+
+  stopifnot(!exists(from) || !exists(to))
 
   to <- suppressWarnings(lubridate::as_date(to))
   from <- suppressWarnings(lubridate::as_date(from))
