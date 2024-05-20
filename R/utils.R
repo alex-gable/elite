@@ -43,7 +43,8 @@ ep_string_to_slug <- function(str) {
 
   # remove accents, swap ñ for n, etc
   from <- "àáäâèéëêìíïîòóöôùúüûñç·/_,:;"
-  to   <- "aaaaeeeeiiiioooouuuunc------"
+  to <- "aaaaeeeeiiiioooouuuunc------"
+
   for (i in seq_along(from)) {
     str <- gsub(pattern = substr(from, i, i), replacement = substr(to, i, i), x = str, fixed = TRUE)
   }
@@ -56,9 +57,9 @@ ep_string_to_slug <- function(str) {
 }
 
 #' Extends rvest::html_table to include links when present.
-#' 
+#'
 #' @param html_table A rvest::html_node object containing a table, in HTML.
-#' 
+#'
 #' @return A tibble with the same columns as the table, plus columns for each link in the table.
 #' named with {column_name}_url.
 #'
@@ -142,4 +143,55 @@ html_table_with_links <- function(html_table) {
 #' @export
 as_numeric_quietly <- function(x) {
   suppressWarnings(as.numeric(x))
+}
+
+#' Check if provided draft name is valid
+#'
+#' @param draft_type A character string specifying league and draft type.
+#'
+#' @examples validate_draft_type("nhl entry draft")
+#'
+#' @export
+validate_draft_type <- function(draft_type) {
+
+  valid_draft_types <- c("nhl entry draft",
+                         "nhl expansion draft",
+                         "nhl supplemental draft",
+                         "wha amateur draft",
+                         "khl draft",
+                         "lnah draft",
+                         "nwhl draft",
+                         "cwhl draft",
+                         "canada",
+                         "bchl affiliate player draft",
+                         "cchl bantam protected draft",
+                         "cchl draft",
+                         "chl import draft",
+                         "mjahl draft",
+                         "mjhl draft",
+                         "gmhl draft",
+                         "ohl priority selection",
+                         "ohl u18 priority selection",
+                         "qjhl draft",
+                         "qjhl expansion draft",
+                         "qjhl territorial draft",
+                         "qmjhl american draft",
+                         "qmjhl entry draft",
+                         "qmjhl expansion draft",
+                         "sijhl draft",
+                         "sjhl bantam draft",
+                         "whl bantam draft",
+                         "whl us prospect draft",
+                         "usa",
+                         "nahl entry draft",
+                         "nahl supplemental draft",
+                         "na3hl draft",
+                         "ncdc entry draft",
+                         "ncdc futures draft",
+                         "ushl entry draft",
+                         "ushl futures draft")
+
+  is_valid_draft_type <- draft_type %in% valid_draft_types
+
+  stopifnot(is_valid_draft_type)
 }
