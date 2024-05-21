@@ -195,3 +195,8 @@ validate_draft_type <- function(draft_type) {
 
   stopifnot(is_valid_draft_type)
 }
+
+
+strip_currency_format <- function(currency_numeric) {
+  as_numeric_quietly(stringr::str_remove_all(currency_numeric, "\\$|\\,"))
+}
