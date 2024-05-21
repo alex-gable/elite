@@ -24,7 +24,6 @@
 get_player_stats_team <- function(..., progress = FALSE) {
 
   if (progress) {
-
     pb <- progress::progress_bar$new(format = "get_player_stats_team() [:bar] :percent ETA: :eta",
                                      clear = FALSE, total = nrow(...), show_after = 0)
 
@@ -34,12 +33,12 @@ get_player_stats_team <- function(..., progress = FALSE) {
   }
 
   # TODO: Implement insistently
+  # TODO: use insistently and purrr::possibly() to retry on failure
   # get_player_stats_team_insist <- purrr::insistently(fetch_player_stats_team,
   #                                                    rate = purrr::rate_backoff(pause_base = 0.1, max_times = 5))
 
   get_team_player_stats <- function(team, ep_team_url, league, season, ep_team_id, season_slug, ...) {
 
-    # TODO: use insistently and purrr::possibly() to retry on failure
     tryCatch(fetch_player_stats_team(team, ep_team_url, league, season, ep_team_id, season_slug, ...),
 
       error = function(e) {
@@ -78,7 +77,14 @@ get_player_stats_team <- function(..., progress = FALSE) {
   return(player_stats_team)
 }
 
-
+#' Used to player stats for a team
+#'
+#' @param team_url URL for the team's roster page
+#' @param team Team name
+#' @param league League name
+#' @param season Season
+#'
+#' @return A tibble of player stats
 fetch_player_stats_team <- function(team, ep_team_url, league, season, ep_team_id, season_slug, ...) {
 
   team_player_stats_page <- fetch_team_player_stats_page(ep_team_id, season_slug)
@@ -93,8 +99,13 @@ fetch_player_stats_team <- function(team, ep_team_url, league, season, ep_team_i
     dplyr::mutate(dplyr::across(games_played:save_percentage_playoffs, as_numeric_quietly)) %>%
     dplyr::select(name, team, league, season, dplyr::everything())
 
+  if (progress) {
+    pb$tick()
+  }
+
   return(dataframe)
 }
+
 
 #' @title Fetch team player stats page
 #' @description Fetches a team player stats page from Elite Prospects. Caches the results to disk by default
@@ -141,9 +152,6 @@ fetch_team_player_stats_page <- function(ep_team_id, season_slug, ...) {
 
   page <- httr::content(mget_page(ep_team_id, season_slug),
                         as = "text", type = "text/html", encoding = "UTF-8")
-
-  # page <- httr::content(.get_page(team_id, season_slug),
-  #                       as = "text", type = "text/html", encoding = "UTF-8")
 
   return(xml2::read_html(page))
 }
@@ -230,120 +238,4 @@ parse_goalie_stats <- function(team_player_stats_page) {
                   ep_player_slug = stringr::str_extract(ep_player_url, "(?<=player/)([0-9]+/.+)", 1)) |>
     dplyr::select(name, position, league, dplyr::everything()) |>
     dplyr::mutate_all(stringr::str_squish)
-}
-
-#' Used to player stats for a team
-#'
-#' @param team_url URL for the team's roster page
-#' @param team Team name
-#' @param league League name
-#' @param season Season
-#'
-#' @return A tibble of player stats
-z_fetch_player_stats_team <- function(team_url, team, league, season, ...) {
-  print(team_url)
-  .get_page <- function(url) {
-    page_gotten <- httr::GET(url)
-    return(page_gotten)
-  }
-
-  mget_page <- memoise::memoise(.get_page, cache = cachem::cache_disk())
-
-  page_out <- httr::content(mget_page(team_url))
-
-  page <- page_out %>% xml2::read_html()
-
-  # print(page)
-
-  # return(page)
-
-  player_stats <- page %>%
-    rvest::html_node('[class="table table-striped table-sortable skater-stats highlight-stats"]') %>%
-    rvest::html_nodes(".table.table-striped.table-sortable.skater-stats.highlight-stats") %>%
-    rvest::html_table() %>%
-    purrr::set_names("number", "name", "games_played", "goals", "assists", "points", "penalty_minutes", "plus_minus",
-                     "blank", "games_played_playoffs", "goals_playoffs", "assists_playoffs", "points_playoffs",
-                     "penalty_minutes_playoffs", "plus_minus_playoffs") %>%
-    tibble::as_tibble() %>%
-    dplyr::mutate(league = ifelse(name != "" & is.na(number), name, NA)) %>%
-    tidyr::fill(league, .direction = "down") %>%
-    dplyr::filter(!is.na(number)) %>%
-    dplyr::mutate(position = stringr::str_split(name, "\\(", simplify = TRUE, n = 2)[, 2]) %>%
-    dplyr::mutate(position = stringr::str_split(position, "\\)", simplify = TRUE, n = 2)[, 1]) %>%
-    dplyr::mutate(name = stringr::str_split(name, "\\(", simplify = TRUE, n = 2)[, 1]) %>%
-    dplyr::mutate_all(~ dplyr::na_if(., "-")) %>%
-    dplyr::mutate_all(~ dplyr::na_if(., "")) %>%
-    dplyr::mutate(goals_against_average = NA) %>%
-    dplyr::mutate(save_percentage = NA) %>%
-    dplyr::mutate(goals_against_average_playoffs = NA) %>%
-    dplyr::mutate(save_percentage_playoffs = NA) %>%
-    dplyr::select(-c(blank, number)) %>%
-    dplyr::select(name, position, league, dplyr::everything()) %>%
-    dplyr::mutate_all(stringr::str_squish)
-
-  goalie_stats <- page %>%
-    rvest::html_node('[class="table table-striped table-sortable goalie-stats highlight-stats"]') %>%
-    rvest::html_table() %>%
-    purrr::set_names("number", "name", "games_played", "goals_against_average", "save_percentage", "blank",
-                     "games_played_playoffs", "goals_against_average_playoffs", "save_percentage_playoffs") %>%
-    tibble::as_tibble() %>%
-    dplyr::mutate(league = ifelse(name != "" & is.na(number), name, NA)) %>%
-    tidyr::fill(league, .direction = "down") %>%
-    dplyr::filter(!is.na(number)) %>%
-    dplyr::mutate_all(~ dplyr::na_if(., "-")) %>%
-    dplyr::mutate_all(~ dplyr::na_if(., "")) %>%
-    dplyr::mutate(position = "G") %>%
-    dplyr::mutate(goals = NA) %>%
-    dplyr::mutate(assists = NA) %>%
-    dplyr::mutate(points = NA) %>%
-    dplyr::mutate(penalty_minutes = NA) %>%
-    dplyr::mutate(plus_minus = NA) %>%
-    dplyr::mutate(goals_playoffs = NA) %>%
-    dplyr::mutate(assists_playoffs = NA) %>%
-    dplyr::mutate(points_playoffs = NA) %>%
-    dplyr::mutate(penalty_minutes_playoffs = NA) %>%
-    dplyr::mutate(plus_minus_playoffs = NA) %>%
-    dplyr::select(-c(blank, number)) %>%
-    dplyr::select(name, position, league, dplyr::everything()) %>%
-    dplyr::mutate_all(stringr::str_squish)
-
-  skater_urls <- page %>%
-    rvest::html_nodes(".skater-stats td a") %>%
-    rvest::html_attr("href") %>%
-    tibble::enframe(name = NULL) %>%
-    purrr::set_names("player_url") %>%
-    dplyr::filter(stringr::str_detect(player_url, "https\\:\\/\\/www\\.eliteprospects\\.com\\/player\\/"))
-
-  goalie_urls <- page %>%
-    rvest::html_nodes(".goalie-stats td a") %>%
-    rvest::html_attr("href") %>%
-    tibble::enframe(name = NULL) %>%
-    purrr::set_names("player_url") %>%
-    dplyr::filter(stringr::str_detect(player_url, "https\\:\\/\\/www\\.eliteprospects\\.com\\/player\\/"))
-
-  player_urls <- skater_urls %>% dplyr::bind_rows(goalie_urls)
-
-  all_data <- player_stats %>%
-    dplyr::bind_rows(goalie_stats) %>%
-    dplyr::bind_cols(player_urls) %>%
-    dplyr::mutate(team = team) %>%
-    dplyr::mutate(season = season) %>%
-    dplyr::mutate(team_url = team_url) %>%
-    dplyr::mutate_at(dplyr::vars(-c(name, team, league, season, position, player_url, team_url)), as.numeric) %>%
-    dplyr::select(name, team, league, season, dplyr::everything())
-
-  is_team_actually_in_league <- any(all_data[["league"]] == league)
-
-  if (is_team_actually_in_league == FALSE) {
-
-    all_data <- tibble::tibble()
-
-  }
-
-  if (progress) {
-    pb$tick()
-  }
-
-  return(all_data)
-
 }
