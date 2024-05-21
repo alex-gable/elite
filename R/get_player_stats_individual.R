@@ -43,21 +43,20 @@
 #'
 get_player_stats_individual <- function(..., progress = FALSE, strip_redundancy = TRUE) {
 
-  # if (progress) {
-  #   pb <- progress::progress_bar$new(format = "get_player_stats_individual() [:bar] :percent ETA: :eta",
-  #                                    clear = FALSE, total = nrow(...), show_after = 0)
-
-  #   cat("\n")
-
-  #   pb$tick(0)
-  # }
+  if (progress) {
+    bar <- list(type = "iterator",
+                format = "{cli::pb_spin} Getting Stats for Individual(s): {cli::pb_current}/{cli::pb_total} | {cli::pb_eta_str}", #nolint
+                show_after = 0,
+                clear = TRUE)
+  } else {
+    bar <- NULL
+  }
 
   # get_individual_player_stats_insist <- purrr::insistently(fetch_individual_player_stats, # nolint
   #                                                          rate = purrr::rate_delay(pause = 0.1, max_times = 10))
 
   get_individual_player_stats <- function(ep_player_url, ep_player_id, ...) {
 
-    # tryCatch(get_individual_player_stats_insist(ep_player_url, ep_player_id, ...),
     tryCatch(fetch_individual_player_stats(ep_player_url, ep_player_id, ...),
 
       error = function(e) {
@@ -79,76 +78,11 @@ get_player_stats_individual <- function(..., progress = FALSE, strip_redundancy 
 
   }
 
-  player_stats_individual <- purrr::pmap_dfr(..., get_individual_player_stats)
+  player_stats_individual <- purrr::pmap_dfr(..., get_individual_player_stats, .progress = bar)
 
   mydata <- player_stats_individual
 
   return(mydata)
-
-  # if ("pick_number" %in% colnames(mydata)) {
-
-  #   mydata <- mydata %>%
-  #     dplyr::mutate(draft_eligibility_date = stringr::str_c(draft_year, "09-15", sep = "-")) %>%
-  #     # TODO: birthday is not available in the data
-  #     # dplyr::mutate(age = elite::get_years_difference(birthday, draft_eligibility_date)) %>%
-  #     dplyr::mutate(age = NA, shot_handedness = NA, birth_place = NA, birth_country = NA) %>%
-  #     dplyr::select(draft_league, draft_year, pick_number, round, draft_team, name, position, shot_handedness,
-  #            birth_place, birth_country, birthday, height, weight, age, player_url, name_, position_,
-  #            player_url_, player_statistics) %>%
-  #     dplyr::mutate_at(dplyr::vars(c(draft_league, draft_year, draft_team,
-  #                                    name, position, shot_handedness, birth_place,
-  #                      birth_country, birthday, name_, position_, player_url_, player_url)),
-  #               as.character) %>%
-  #     dplyr::mutate_at(dplyr::vars(-c(draft_league, draft_year, draft_team,
-  #                                     name, position, shot_handedness, birth_place,
-  #                       birth_country, birthday, name_, position_, player_url_, player_url, player_statistics)),
-  #               as.numeric)
-
-  # } else if ("season" %in% colnames(mydata)) {
-
-  #   mydata <- mydata %>%
-  #     dplyr::mutate(season_short = as.numeric(stringr::str_split(season, "-", simplify = TRUE, n = 2)[, 1]) + 1) %>%
-  #     dplyr::mutate(draft_eligibility_date = stringr::str_c(as.character(season_short), "09-15", sep = "-")) %>%
-  #     # TODO: birthday is not available in the data
-  #     # dplyr::mutate(age = elite::get_years_difference(birthday, draft_eligibility_date)) %>%
-  #     dplyr::mutate(age = NA, shot_handedness = NA, birth_place = NA, birth_country = NA) %>%
-  #     dplyr::select(name, team, league, position, shot_handedness, birth_place, birth_country, birthday, height,
-  #                   weight,
-  #            season, season_short, age, games_played, goals, assists, points, penalty_minutes, plus_minus,
-  #            games_played_playoffs, goals_playoffs, assists_playoffs, points_playoffs, penalty_minutes_playoffs,
-  #            plus_minus_playoffs, player_url, team_url, name_, position_, player_url_, player_statistics) %>%
-  #     dplyr::mutate_at(dplyr::vars(c(name, team, league, position, shot_handedness, birth_place, birth_country,
-  #                                    birthday,
-  #                                    season, player_url, team_url, name_, position_, player_url_)), as.character) %>%
-  #     dplyr::mutate_at(dplyr::vars(-c(name, team, league, position, shot_handedness, birth_place, birth_country,
-  #                                      birthday, season,
-  #                       player_url, team_url, name_, position_, player_url_, player_statistics)), as.numeric)
-
-  # } else {
-
-  #   mydata <- mydata %>%
-  #     dplyr::select(name, position = position_, shot_handedness, birth_place, birth_country, birthday, height, weight,
-  #            player_url, name_, player_url_, player_statistics) %>%
-  #     dplyr::mutate_at(dplyr::vars(c(name, position, shot_handedness, birth_place, birth_country, birthday,
-  #                                    player_url, name_, player_url_)), as.character) %>%
-  #     dplyr::mutate_at(dplyr::vars(-c(name, position, shot_handedness, birth_place, birth_country, birthday,
-  #                                     player_url, name_, player_url_, player_statistics)), as.numeric)
-
-  # }
-
-  # if (strip_redundancy && "season" %in% colnames(mydata)) {
-
-  #   mydata <- mydata %>% dplyr::select(-c(name_, position_, player_url_))
-
-  # } else if (strip_redundancy && !c("season" %in% colnames(mydata))) {
-
-  #   mydata <- mydata %>% dplyr::select(-c(name_, player_url_))
-
-  # }
-
-  # cat("\n")
-
-  # return(mydata)
 }
 
 
@@ -198,10 +132,6 @@ fetch_individual_player_stats <- function(ep_player_url, ep_player_id, ...) {
 
   }
 
-  # if (progress) {
-  #   pb$tick()
-  # }
-
   return(all_data)
 
 }
@@ -211,13 +141,14 @@ get_player_vitals <- function(card_page_html) {
   player_vitals_df <- card_page_html %>%
     rvest::html_elements("section.plyr_details") %>%
     rvest::html_elements("div.table-view") %>%
-    rvest::html_elements("div.row") %>%
+    rvest::html_elements("ul.list-unstyled") %>%
+    # rvest::html_elements("div.col-xs") %>%
     rvest::html_elements("li") %>%
     rvest::html_text2() %>%
     stringr::str_split_fixed("\n", 2) %>%
     t() %>%
     as.data.frame() %>%
-    set_colnames(janitor::make_clean_names(dplyr::slice(., 1))) %>%
+    magrittr::set_colnames(janitor::make_clean_names(dplyr::slice(., 1))) %>%
     dplyr::slice(-1) %>%
     tibble::as_tibble() %>%
     dplyr::mutate(birthday = lubridate::mdy(date_of_birth, quiet = TRUE),
@@ -230,13 +161,10 @@ get_player_vitals <- function(card_page_html) {
                   weight = ifelse(stringr::str_detect(weight, "[0-9]"),
                                   stringr::str_split_1(weight, "lbs"),
                                   NA_real_)) %>%
-    # TODO: drop name or use from existing table
     dplyr::mutate_all(~stringr::str_trim(., side = "both")) %>%
     dplyr::mutate_all(~dplyr::na_if(., "-")) %>%
     dplyr::mutate_all(~dplyr::na_if(., "")) %>%
-    # TODO: coalesce shoots, catches into `shot_handedness`, need to do a check later
-    # dplyr::mutate(shot_handedness = dplyr::coalesce(shoots, catches)) %>%
-    dplyr::select(-c(feet_tall, inches_tall, age, youth_team, date_of_birth, place_of_birth))
+    dplyr::select(-any_of(c("feet_tall", "inches_tall", "age", "youth_team", "date_of_birth", "highlights", "agency")))
 
   if ("shoots" %in% colnames(player_vitals_df)) {
     player_vitals_df <- player_vitals_df %>%
@@ -251,7 +179,40 @@ get_player_vitals <- function(card_page_html) {
       dplyr::mutate(shot_handedness = NA_character_)
   }
 
+  if ("cap_hit" %in% colnames(player_vitals_df)) {
+    player_vitals_df <- player_vitals_df %>%
+      dplyr::mutate(cap_hit = strip_currency_format(stringr::str_split_i(cap_hit, "\\s", 1)))
+  } else {
+    player_vitals_df <- player_vitals_df %>%
+      dplyr::mutate(cap_hit = NA_real_)
+  }
+
+  if ("nhl_rights" %in% colnames(player_vitals_df)) {
+    player_vitals_df <- player_vitals_df %>%
+      dplyr::mutate(
+        nhl_rights_team = stringr::str_split_i(nhl_rights, " / ", 1),
+        nhl_rights_status = stringr::str_split_i(nhl_rights, " / ", 2)
+      ) %>%
+      dplyr::select(-nhl_rights)
+  } else {
+    player_vitals_df <- player_vitals_df %>%
+      dplyr::mutate(
+        nhl_rights_team = NA_character_,
+        nhl_rights_status = NA_character_
+      )
+  }
+
+  player_name <- card_page_html %>%
+    rvest::html_element("section.plyr_details") %>%
+    rvest::html_element("h1.plytitle") %>%
+    rvest::html_text2() %>%
+    stringr::str_split_i(" a.k.a. ", 1)
+
+  player_vitals_df <- player_vitals_df %>%
+    dplyr::mutate(name = player_name)
+
   return(player_vitals_df)
+
 }
 
 
@@ -271,7 +232,7 @@ get_stats_page_table <- function(stats_page, player_vitals) {
 
 
   stats_for_player <- base_table %>%
-    rvest::html_table(na.strings = c("-", "-*")) %>%
+    rvest::html_table(na.strings = c("-", "-*", "- *", "")) %>%
     # TODO: no idea why this is returning a list despite being a single node
     purrr::pluck(1) %>%
     set_colnames(stats_table_colnames) %>%
@@ -292,8 +253,10 @@ get_stats_page_table <- function(stats_page, player_vitals) {
     # TODO: pull out draft eligible age function/calculation
     dplyr::mutate(draft_eligibility_date = stringr::str_c(as.character(season_short), "09-15", sep = "-")) %>%
     dplyr::mutate(age = elite::get_years_difference(birthday, draft_eligibility_date)) %>%
-    dplyr::mutate(across(.cols = starts_with(c("regular", "postseason")),
+    dplyr::mutate(across(.cols = c(starts_with(c("regular", "postseason")), -contains("wlt")),
                          .fns = ~ as_numeric_quietly(stringr::str_replace(.x, "\\*", "")))) %>%
+    dplyr::mutate(across(.cols = contains("wlt"),
+                         .fns = ~ stringr::str_replace(.x, "\\s?\\*", ""))) %>%
     dplyr::select(-c(draft_eligibility_date, birthday))
 
   return(transformed_stats_for_player)
@@ -303,7 +266,6 @@ get_stats_page_table <- function(stats_page, player_vitals) {
 parse_individual_skater_stats <- function(skater_stats_table) {
 
   skater_stats_parsed <- skater_stats_table %>%
-    # TODO: probably need to add more goalie columns
     dplyr::mutate(goals_against_average = NA_real_,
                   save_percentage = NA_real_,
                   goals_against = NA_real_,
@@ -439,14 +401,13 @@ fetch_player_card <- function(ep_player_url, ...) {
   mget_embed_page <- memoise::memoise(.get_embed_page,
                                       cache = cachem::cache_disk(max_age = 3600))
 
-
-  # page <- httr::content(.get_embed_page(ep_player_url),
   page <- httr::content(mget_embed_page(ep_player_url),
                         as = "text", type = "text/html", encoding = "UTF-8")
 
   return(xml2::read_html(page))
 }
 
+# TODO: make this line up with a full row
 build_empty_player_stats_row <- function() {
   row_base <- tibble::tibble(shot_handedness = NA, birth_place = NA, birth_country = NA, birthday = NA,
                              height = NA, weight = NA, age = NA, name_ = NA, position_ = NA, player_url_ = NA)
@@ -483,8 +444,6 @@ fetch_player_stats_individual <- function(ep_player_id, ...) { #nolint
     accept_header <- "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7" #nolint
     page_gotten <- httr::GET(
       page_url,
-      # "https://www.eliteprospects.com/ajax/player.stats.default",
-      # query = list(playerId = ep_player_id),
       httr::user_agent(agent),
       httr::content_type("text/html"),
       httr::add_headers(
@@ -511,14 +470,8 @@ fetch_player_stats_individual <- function(ep_player_id, ...) { #nolint
   mget_page <- memoise::memoise(.get_page,
                                 cache = cachem::cache_disk(max_age = 3600))
 
-  # page <- httr::content(.get_page(ep_player_id),
   page <- httr::content(mget_page(ep_player_id),
                         as = "text", type = "text/html", encoding = "UTF-8")
 
   return(xml2::read_html(page))
 }
-
-
-# https://www.eliteprospects.com/player.php?player=130383 use to get a player just by id
-# /team.php?team=74 use to get a team just by id
-# contract: /ajax/modal.player-contract?playerId= use to get contract info
