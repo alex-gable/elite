@@ -4,7 +4,7 @@
 #'
 #' @param ... Function requires a \code{team_url}, \code{team}, \code{league}, and \code{season}.
 #' Additional data may be supplied. All of this information comes directly from \code{get_teams()}, if desired.
-#' @param progress Sets a Progress Bar. Defaults to \code{TRUE}.
+#' @param progress Sets a Progress Bar. Defaults to \code{FALSE}.
 #' @examples
 #'
 #' # The function works in conjunction with get_teams()
@@ -24,12 +24,12 @@
 get_player_stats_team <- function(..., progress = FALSE) {
 
   if (progress) {
-    pb <- progress::progress_bar$new(format = "get_player_stats_team() [:bar] :percent ETA: :eta",
-                                     clear = FALSE, total = nrow(...), show_after = 0)
-
-    cat("\n")
-
-    pb$tick(0)
+    bar <- list(type = "iterator",
+                format = "Getting Player Stats for Team(s): {cli::pb_bar} {cli::pb_percent}",
+                show_after = 0,
+                clear = TRUE)
+  } else {
+    bar <- NULL
   }
 
   # TODO: Implement insistently
@@ -69,7 +69,7 @@ get_player_stats_team <- function(..., progress = FALSE) {
   }
 
   # TODO: readd progress bar
-  fetched_team_player_stats <- purrr::pmap(..., get_team_player_stats)
+  fetched_team_player_stats <- purrr::pmap(..., get_team_player_stats, .progress = bar)
   player_stats_team <- purrr::list_rbind(fetched_team_player_stats)
 
   cat("\n")
@@ -98,10 +98,6 @@ fetch_player_stats_team <- function(team, ep_team_url, league, season, ep_team_i
                   ep_team_url = ep_team_url) %>%
     dplyr::mutate(dplyr::across(games_played:save_percentage_playoffs, as_numeric_quietly)) %>%
     dplyr::select(name, team, league, season, dplyr::everything())
-
-  if (progress) {
-    pb$tick()
-  }
 
   return(dataframe)
 }
@@ -227,7 +223,6 @@ parse_goalie_stats <- function(team_player_stats_page) {
       goals_against_average_playoffs = gaa_2,
       save_percentage_playoffs = sv_percent_2,
       ep_player_url = player_url
-
     ) |>
     dplyr::mutate(league = dplyr::na_if(league, "")) |>
     tidyr::fill(league, .direction = "down") |>
