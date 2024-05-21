@@ -1,3 +1,10 @@
+# generated/config files
 .Rproj.user
 .Rhistory
 .RData
+.Rproj
+.vscode
+.DS_Store
+
+# project files
+tmp
