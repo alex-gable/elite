@@ -20,6 +20,15 @@
 #'
 get_teams <- function(league, season, progress = TRUE, ...) {
 
+  if (progress) {
+    bar <- list(type = "iterator",
+                format = "Getting Team(s): {cli::pb_bar} {cli::pb_percent}",
+                show_after = 0,
+                clear = TRUE)
+  } else {
+    bar <- NULL
+  }
+
   if (any(nchar(season) > 4) || any(!stringr::str_detect(season, "[0-9]{4,4}"))) {
 
     cat("\n")
@@ -48,17 +57,6 @@ get_teams <- function(league, season, progress = TRUE, ...) {
     purrr::set_names("season")
 
   mydata <- tidyr::crossing(leagues, seasons)
-  print(mydata)
-
-  ## TODO: fix progress bar
-  # if (progress) {
-
-  #   pb <- progress::progress_bar$new(format = "get_teams() [:bar] :percent ETA: :eta",
-  #                                    clear = FALSE, total = nrow(mydata), show_after = 0)
-  #   cat("\n")
-
-  #   pb$tick(0)
-  # }
 
   insistently_fetch_league_teams <- purrr::insistently(fetch_league_teams,
                                                        rate = purrr::rate_backoff(pause_base = 0.1, max_times = 5))
@@ -87,15 +85,11 @@ get_teams <- function(league, season, progress = TRUE, ...) {
 
   }
 
-  # league_team_data <- purrr::map2_dfr(mydata[["league"]], mydata[["season"]], try_fetch_teams)
-  fetched_league_teams <- purrr::map2(mydata[["league"]], mydata[["season"]], try_fetch_teams)
-  # print(result_list)
+  fetched_league_teams <- purrr::map2(mydata[["league"]], mydata[["season"]], try_fetch_teams, .progress = bar)
 
   league_team_data <- purrr::list_rbind(fetched_league_teams)
 
   cat("\n")
-
-  # print(league_team_data)
 
   return(league_team_data)
 
@@ -147,94 +141,5 @@ fetch_league_teams <- function(league, season, ...) {
   teams_df <- teams_df %>%
     dplyr::select(team, ep_team_url = team_stats_url, league, season, ep_team_id =  team_id, season_slug)
 
-  # if (progress) {
-  #   pb$tick()
-  # }
-
   return(teams_df)
-}
-
-
-z_fetch_league_teams <- function(league, season = get_current_year(), ...) {
-
-  pause <- function(league, season, ...) {
-    seq(3, 7, by = 0.001) %>%
-      sample(1) %>%
-      Sys.sleep()
-  }
-
-  mpause <- memoise::memoise(pause)
-
-  mpause()
-
-  memoised_read_html <- memoise::memoise(xml2::read_html)
-
-  page_url <- stringr::str_c("https://www.eliteprospects.com/league/", league, "/", season)
-  print(paste0("\n", page_url))
-
-  page <- memoised_read_html(page_url)
-
-  league_name <- page %>%
-    rvest::html_nodes("small") %>%
-    rvest::html_text() %>%
-    stringr::str_squish()
-
-  team_urls_rosters <- page %>%
-    rvest::html_nodes(".column-4 i+ a") %>%
-    rvest::html_attr("href") %>%
-    ifelse(stringr::str_detect(., "[0-9]{4,4}-[0-9]{4,4}"), ., stringr::str_c(., season, sep = "/")) %>%
-    ifelse(stringr::str_detect(., "https"), stringr::str_c(., "?tab=stats"), .) %>%
-    tibble::enframe(name = NULL) %>%
-    purrr::set_names("team_url") %>%
-    dplyr::mutate(team_url = stringr::str_replace_all(team_url, "\\-\\-", ""))
-
-  teams_rosters <- page %>%
-    rvest::html_nodes(".column-4 i+ a") %>%
-    rvest::html_text() %>%
-    stringr::str_squish() %>%
-    tibble::enframe(name = NULL) %>%
-    purrr::set_names("team")
-
-  team_urls_standings <- page %>%
-    rvest::html_nodes("#standings .team a") %>%
-    rvest::html_attr("href") %>%
-    ifelse(stringr::str_detect(., "[0-9]{4,4}-[0-9]{4,4}"), ., stringr::str_c(., season, sep = "/")) %>%
-    ifelse(stringr::str_detect(., "https"), stringr::str_c(., "?tab=stats"), .) %>%
-    tibble::enframe(name = NULL) %>%
-    purrr::set_names("team_url") %>%
-    dplyr::mutate(team_url = stringr::str_replace_all(team_url, "\\-\\-", ""))
-
-  teams_standings <- page %>%
-    rvest::html_nodes("#standings .team a") %>%
-    rvest::html_text() %>%
-    stringr::str_squish() %>%
-    tibble::enframe(name = NULL) %>%
-    purrr::set_names("team")
-
-  teams <- teams_standings %>%
-    dplyr::bind_rows(teams_rosters) %>%
-    dplyr::mutate(team_lower = tolower(team)) %>%
-    dplyr::distinct(team_lower, .keep_all = TRUE) %>%
-    dplyr::select(team)
-
-  team_urls <- team_urls_standings %>%
-    dplyr::bind_rows(team_urls_rosters) %>%
-    dplyr::mutate(team_url = stringr::str_replace_all(team_url, c("\\-\\/" = "/"))) %>%
-    dplyr::distinct()
-
-  season <- stringr::str_split(season, "-", simplify = TRUE, n = 2)[, 2] %>%
-    stringr::str_sub(3, 4) %>%
-    stringr::str_c(stringr::str_split(season, "-", simplify = TRUE, n = 2)[, 1], ., sep = "-")
-
-  all_data <- teams %>%
-    dplyr::bind_cols(team_urls) %>%
-    dplyr::mutate(league = league_name) %>%
-    dplyr::mutate(season = season)
-
-  # if (exists("progress") && progress && exists("pb")) {
-  #   pb$tick()
-  # }
-
-  return(all_data)
-
 }
