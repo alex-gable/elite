@@ -46,7 +46,7 @@ get_drafts <- function(draft_type = "nhl entry draft",
   draft_types <- draft_type %>%
     tibble::as_tibble() %>%
     purrr::set_names("draft_type") %>%
-    mutate(draft_type = stringr::str_replace_all(draft_type, " ", "-"))
+    dplyr::mutate(draft_type = stringr::str_replace_all(draft_type, " ", "-"))
 
   draft_years <- draft_year %>%
     tibble::as_tibble() %>%
@@ -54,16 +54,16 @@ get_drafts <- function(draft_type = "nhl entry draft",
 
   mydata <- tidyr::crossing(draft_types, draft_years)
 
-  if (progress) {
+  # if (progress) {
 
-    pb <- progress::progress_bar$new(format = "get_drafts() [:bar] :percent ETA: :eta",
-                                     clear = FALSE, total = nrow(mydata), show_after = 0)
+  #   pb <- progress::progress_bar$new(format = "get_drafts() [:bar] :percent ETA: :eta",
+  #                                    clear = FALSE, total = nrow(mydata), show_after = 0)
 
-    cat("\n")
+  #   cat("\n")
 
-    pb$tick(0)
+  #   pb$tick(0)
 
-  }
+  # }
 
   fetch_draft_insist <- purrr::insistently(fetch_draft, rate = purrr::rate_delay(pause = 0.1, max_times = 10))
 
@@ -116,9 +116,9 @@ get_drafts <- function(draft_type = "nhl entry draft",
 #'
 fetch_draft <- function(draft_type, draft_year, ...) {
 
-  seq(7, 11, by = 0.001) %>%
-    sample(1) %>%
-    Sys.sleep()
+  # seq(7, 11, by = 0.001) %>%
+  #   sample(1) %>%
+  #   Sys.sleep()
 
   page <- stringr::str_c("https://www.eliteprospects.com/draft/", draft_type, "/", draft_year) %>% xml2::read_html()
 
@@ -133,13 +133,13 @@ fetch_draft <- function(draft_type, draft_year, ...) {
     rvest::html_text() %>%
     stringr::str_squish() %>%
     tibble::as_tibble() %>%
-    mutate(round = ifelse(stringr::str_detect(value, "ROUND"), value, NA)) %>%
+    dplyr::mutate(round = ifelse(stringr::str_detect(value, "ROUND"), value, NA)) %>%
     tidyr::fill(round) %>%
-    filter(!stringr::str_detect(value, "ROUND")) %>%
-    mutate(value = stringr::str_replace(value, "#", "")) %>%
-    mutate(round = stringr::str_replace(round, "ROUND", "")) %>%
-    mutate_all(stringr::str_squish) %>%
-    rename(round = round, pick_number = value)
+    dplyr::filter(!stringr::str_detect(value, "ROUND")) %>%
+    dplyr::mutate(value = stringr::str_replace(value, "#", "")) %>%
+    dplyr::mutate(round = stringr::str_replace(round, "ROUND", "")) %>%
+    dplyr::mutate_all(stringr::str_squish) %>%
+    dplyr::rename(round = round, pick_number = value)
 
   draft_team <- page %>%
     rvest::html_nodes(".team a") %>%
@@ -153,10 +153,10 @@ fetch_draft <- function(draft_type, draft_year, ...) {
     rvest::html_text() %>%
     stringr::str_squish() %>%
     tibble::as_tibble() %>%
-    mutate(position = stringr::str_split(value, "\\(", simplify = TRUE, n = 2)[, 2]) %>%
-    mutate(position = stringr::str_split(position, "\\)", simplify = TRUE, n = 2)[, 1]) %>%
-    mutate(name = stringr::str_split(value, "\\(", simplify = TRUE, n = 2)[, 1]) %>%
-    mutate_all(stringr::str_squish)
+    dplyr::mutate(position = stringr::str_split(value, "\\(", simplify = TRUE, n = 2)[, 2]) %>%
+    dplyr::mutate(position = stringr::str_split(position, "\\)", simplify = TRUE, n = 2)[, 1]) %>%
+    dplyr::mutate(name = stringr::str_split(value, "\\(", simplify = TRUE, n = 2)[, 1]) %>%
+    dplyr::mutate_all(stringr::str_squish)
 
   player_url <- page %>%
     rvest::html_nodes("#drafted-players .txt-blue a") %>%
@@ -172,28 +172,29 @@ fetch_draft <- function(draft_type, draft_year, ...) {
     purrr::set_names("value")
 
   no_selection_info <- player_names_with_no_selection %>%
-    bind_cols(draft_pick_info) %>%
-    bind_cols(draft_team) %>%
-    anti_join(player_info, by = c("value" = "value"))
+    dplyr::bind_cols(draft_pick_info) %>%
+    dplyr::bind_cols(draft_team) %>%
+    dplyr::anti_join(player_info, by = c("value" = "value"))
 
   everything_w_no_selection_info <- draft_pick_info %>%
-    bind_cols(draft_team) %>%
-    anti_join(no_selection_info, by = c("pick_number" = "pick_number", "round" = "round")) %>%
-    bind_cols(player_info) %>%
-    bind_cols(player_url)
+    dplyr::bind_cols(draft_team) %>%
+    dplyr::anti_join(no_selection_info, by = c("pick_number" = "pick_number", "round" = "round")) %>%
+    dplyr::bind_cols(player_info) %>%
+    dplyr::bind_cols(player_url)
 
   all_data <- everything_w_no_selection_info %>%
-    bind_rows(no_selection_info) %>%
-    mutate(draft_league = draft_league) %>%
-    mutate(draft_year = draft_year) %>%
-    mutate_at(vars(pick_number, round), as.numeric) %>%
-    select(-c(value)) %>%
-    select(draft_league, draft_year, pick_number, round, draft_team, name, position, player_url) %>%
-    arrange(pick_number)
+    dplyr::bind_rows(no_selection_info) %>%
+    dplyr::mutate(draft_league = draft_league) %>%
+    dplyr::mutate(draft_year = draft_year) %>%
+    dplyr::mutate_at(dplyr::vars(pick_number, round), as.numeric) %>%
+    dplyr::select(-c(value)) %>%
+    dplyr::select(draft_league, draft_year, pick_number, round, draft_team,
+                  name, position, ep_player_url = player_url) %>%
+    dplyr::arrange(pick_number)
 
-  if (progress) {
-    pb$tick()
-  }
+  # if (progress) {
+  #   pb$tick()
+  # }
 
   return(all_data)
 }
