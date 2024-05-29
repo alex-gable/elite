@@ -73,8 +73,9 @@ create_elite_tables <- function() {
 
 }
 
-create_elite_table <- function(table_name) {
-  ct_con <- elite_db_connect()
+create_elite_table <- function(table_name, con = NULL) {
+  ct_con <- if (is.null(con)) elite_db_connect() else con
+
   table_spec <- get_table_spec(table_name)
 
   if (DBI::dbExistsTable(ct_con, table_name)) {
@@ -89,7 +90,8 @@ create_elite_table <- function(table_name) {
 
   check_table <- DBI::dbExistsTable(ct_con, table_name)
 
-  elite_db_disconnect(ct_con)
+  if (is.null(con)) elite_db_disconnect(ct_con)
+
   return(check_table)
 }
 
@@ -99,11 +101,12 @@ get_table_spec <- function(table) {
     "teams" = c(
       team = "TEXT",
       league = "TEXT",
-      ep_team_url = "TEXT",
+      ep_team_url_base = "TEXT",
       ep_team_id = "INTEGER"
     ),
     "team_seasons" = c(
       ep_team_id = "INTEGER",
+      league = "TEXT",
       season = "INTEGER",
       season_slug = "TEXT",
       ep_team_url = "TEXT"
@@ -134,11 +137,15 @@ get_table_spec <- function(table) {
       time_on_ice = "INTEGER",
       saves = "INTEGER",
       goals_against_average_playoffs = "REAL",
-      save_percentage_playoffs = "REAL"
+      save_percentage_playoffs = "REAL",
+      ep_player_id = "INTEGER",
+      ep_player_slug = "TEXT",
+      ep_player_url = "TEXT",
+      ep_team_url = "TEXT",
+      ep_team_id = "INTEGER"
     ),
     "teams_individual_stats" = c(
       ep_player_id = "INTEGER",
-      name = "TEXT",
       place_of_birth = "TEXT",
       nation = "TEXT",
       position = "TEXT",
@@ -146,20 +153,19 @@ get_table_spec <- function(table) {
       weight = "INTEGER",
       contract = "TEXT",
       cap_hit = "INTEGER",
-      drated = "TEXT",
+      drafted = "TEXT",
       birthday = "DATE",
       shot_handedness = "TEXT",
       nhl_rights_team = "TEXT",
       nhl_rights_status = "TEXT",
       status = "TEXT"
     ),
-    player_statistics = c(
+    "player_statistics" = c(
       team = "TEXT",
       league = "TEXT",
       captaincy = "TEXT",
       season = "TEXT",
       season_short = "INTEGER",
-      age = "REAL",
       games_played = "INTEGER",
       goals = "INTEGER",
       assists = "INTEGER",
@@ -185,7 +191,9 @@ get_table_spec <- function(table) {
       saves_playoffs = "INTEGER",
       shutouts_playoffs = "INTEGER",
       record_playoffs = "TEXT",
-      time_on_ice_playoffs = "INTEGER"
+      time_on_ice_playoffs = "INTEGER",
+      ep_player_id = "INTEGER",
+      ep_team_id = "INTEGER"
     ),
     "drafts" = c(
       draft_league = "TEXT",
@@ -195,7 +203,10 @@ get_table_spec <- function(table) {
       draft_team = "TEXT",
       name = "TEXT",
       position = "TEXT",
-      ep_player_url = "TEXT"
+      ep_player_url = "TEXT",
+      ep_team_url = "TEXT",
+      ep_player_id = "TEXT",
+      ep_team_id = "TEXT"
     ),
     "contracts" = c(
       season_slug = "TEXT",
@@ -231,13 +242,14 @@ get_table_spec <- function(table) {
 
 }
 
-write_elite_table <- function(data, table_name, distinct = TRUE) {
+write_elite_table <- function(data, table_name, distinct = FALSE) {
   data$updated_at <- lubridate::now(tzone = "UTC")
 
-  table_spec <- get_table_spec(table_name) |> names()
+  table_spec <- get_table_spec(table_name)
+  column_names <- table_spec$columns |> names()
 
   data <- data |>
-    dplyr::select(all_of(table_spec$columns))
+    dplyr::select(all_of(column_names))
 
   if (distinct) {
     data <- data |> dplyr::distinct()
@@ -245,7 +257,27 @@ write_elite_table <- function(data, table_name, distinct = TRUE) {
 
   wt_con <- elite_db_connect()
 
-  DBI::dbWriteTable(wt_con, table_name, data, append = TRUE)
+  if (!DBI::dbExistsTable(wt_con, table_name)) {
+    create_elite_table(table_name, wt_con)
+  }
+
+  DBI::dbWriteTable(wt_con, table_name, data, append = TRUE, overwrite = FALSE)
 
   elite_db_disconnect(wt_con)
+}
+
+drop_elite_table <- function(table_name) {
+  dt_con <- elite_db_connect()
+
+  if (!DBI::dbExistsTable(dt_con, table_name)) {
+    elite_db_disconnect(dt_con)
+    return(TRUE)
+  }
+
+  DBI::dbRemoveTable(dt_con, table_name)
+
+  check_table <- !DBI::dbExistsTable(dt_con, table_name)
+
+  elite_db_disconnect(dt_con)
+  return(check_table)
 }
