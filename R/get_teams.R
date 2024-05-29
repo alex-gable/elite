@@ -126,6 +126,7 @@ fetch_league_teams <- function(league, season, ...) {
     team = team_nodes %>% rvest::html_text() %>% stringr::str_trim(),
     team_url = team_nodes %>% rvest::html_attr("href")
   ) %>%
+    # TODO: clean up & make sense of column names
     dplyr::mutate(team_id = stringr::str_extract(team_url, "(?<=/team/)\\d+"),
                   team_url_ends_with_season = grepl(".*/[0-9]{4}-[0-9]{4}$", team_url),
                   team_url_ending_season = gsub(".*/([0-9]{4}-[0-9]{4})$", "\\1", team_url),
@@ -135,11 +136,13 @@ fetch_league_teams <- function(league, season, ...) {
                                                   "?tab=stats"),
                   league = league,
                   season = season,
-                  season_slug = season_slug)
+                  season_slug = season_slug,
+                  team_stats_url_base = stringr::str_remove(team_stats_url, "\\/[0-9]{4}-[0-9]{4}\\?tab=stats$"))
 
   ## temporary?
   teams_df <- teams_df %>%
-    dplyr::select(team, ep_team_url = team_stats_url, league, season, ep_team_id =  team_id, season_slug)
+    dplyr::select(team, ep_team_url = team_stats_url, league, season,
+                  ep_team_id =  team_id, season_slug, ep_team_url_base = team_stats_url_base)
 
   return(teams_df)
 }
