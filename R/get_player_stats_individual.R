@@ -108,8 +108,9 @@ fetch_individual_player_stats <- function(ep_player_url, ep_player_id, ...) {
 
     # TODO: use this instead for playing stats
     stats_page <- fetch_player_stats_individual(ep_player_id)
-    stats_table <- get_stats_page_table(stats_page, vitals)
+    stats_table <- get_stats_page_table(stats_page) #, vitals)
 
+    # TODO: allow skip vitals (need positition unless using column names or have player info already?)
     if (vitals[["position"]] == "G") {
 
       player_statistics <- stats_table %>%
@@ -216,7 +217,7 @@ get_player_vitals <- function(card_page_html) {
 }
 
 
-get_stats_page_table <- function(stats_page, player_vitals) {
+get_stats_page_table <- function(stats_page) {
 
   base_table <- stats_page %>%
     # rvest::html_children()
@@ -230,13 +231,15 @@ get_stats_page_table <- function(stats_page, player_vitals) {
     rvest::html_attr("class") %>%
     janitor::make_clean_names()
 
-
   stats_for_player <- base_table %>%
-    rvest::html_table(na.strings = c("-", "-*", "- *", "")) %>%
-    # TODO: no idea why this is returning a list despite being a single node
-    purrr::pluck(1) %>%
-    set_colnames(stats_table_colnames) %>%
-    tibble::as_tibble()
+    html_table_with_links(na_strings = c("-", "-*", "- *", "")) %>%
+    # TODO: no idea why this is necessary but it needs double unnesting for some reason
+    tidyr::unnest(cols = c(x), names_repair = janitor::make_clean_names) %>%
+    # TODO: codify url columns
+    magrittr::set_colnames(c(stats_table_colnames, "team_url", "league_url", "postseason_url")) %>%
+    tibble::as_tibble() %>%
+    dplyr::mutate(ep_team_id = stringr::str_extract(team_url, "(?<=/team/)\\d+")) %>%
+    dplyr::select(-ends_with("_url"))
 
   # shared transforms
   transformed_stats_for_player <- stats_for_player %>%
@@ -249,15 +252,15 @@ get_stats_page_table <- function(stats_page, player_vitals) {
     dplyr::mutate_all(stringr::str_squish) %>%
     dplyr::mutate(season_short = purrr::map_int(season,
                                                 ~ as_numeric_quietly(stringr::str_split_i(.x, "-", 1)) + 1)) %>%
-    dplyr::mutate(birthday = player_vitals[["birthday"]]) %>%
+    # dplyr::mutate(birthday = player_vitals[["birthday"]]) %>%
     # TODO: pull out draft eligible age function/calculation
-    dplyr::mutate(draft_eligibility_date = stringr::str_c(as.character(season_short), "09-15", sep = "-")) %>%
-    dplyr::mutate(age = elite::get_years_difference(birthday, draft_eligibility_date)) %>%
+    # dplyr::mutate(draft_eligibility_date = stringr::str_c(as.character(season_short), "09-15", sep = "-")) %>%
+    # dplyr::mutate(age = elite::get_years_difference(birthday, draft_eligibility_date)) %>%
     dplyr::mutate(across(.cols = c(starts_with(c("regular", "postseason")), -contains("wlt")),
                          .fns = ~ as_numeric_quietly(stringr::str_replace(.x, "\\*", "")))) %>%
     dplyr::mutate(across(.cols = contains("wlt"),
-                         .fns = ~ stringr::str_replace(.x, "\\s?\\*", ""))) %>%
-    dplyr::select(-c(draft_eligibility_date, birthday))
+                         .fns = ~ stringr::str_replace(.x, "\\s?\\*", ""))) #%>%
+  # dplyr::select(-c(draft_eligibility_date, birthday))
 
   return(transformed_stats_for_player)
 
@@ -281,7 +284,7 @@ parse_individual_skater_stats <- function(skater_stats_table) {
                   record_playoffs = NA_character_,
                   time_on_ice_playoffs = NA_real_) %>%
     dplyr::select(
-      team, league, captaincy, season, season_short, age,
+      team, league, captaincy, season, season_short, #age,
       games_played = regular_gp,
       goals = regular_g,
       assists = regular_a,
@@ -326,7 +329,7 @@ parse_individual_goalie_stats <- function(goalie_stats_table) {
                   penalty_minutes_playoffs = NA_real_,
                   plus_minus_playoffs = NA_real_) %>%
     dplyr::select(
-      team, league, captaincy, season, season_short, age,
+      team, league, captaincy, season, season_short, #age,
       games_played = regular_gp,
       goals,
       assists,
