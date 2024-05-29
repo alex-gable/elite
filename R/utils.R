@@ -64,47 +64,47 @@ ep_string_to_slug <- function(str) {
 #' named with {column_name}_url.
 #'
 #' @examples
-#' # test_html_table <- read_html(
-#'  "<table>
-#'     <tr>
+#' test_html_table <- rvest::read_html(
+#'      <tr>
 #'       <th>player</th>
 #'       <th>playerLink</th>
+#'       <th>team</th>
+#'       <th>teamLink</th>
 #'     </tr>
 #'     <tr>
-#'       <td class="player">Player 1</td>
-#'       <td class="playerLink"><a href="https://example.com/player1">Profile 1</a></td>
+#'       <td class=\"player\">Player 1</td>
+#'       <td class=\"playerLink\"><a href=\"https://example.com/player1\">Profile 1</a></td>
+#'       <td class=\"team\">A</td>
+#'       <td class=\"teamLink\"><a href=\"https://example.com/teamA\">Team A</a></td>
 #'     </tr>
 #'     <tr>
-#'       <td class="player">Player 2</td>
-#'       <td class="playerLink"><a href="https://example.com/player2">Profile 2</a></td>
+#'       <td class=\"player\">Player 2</td>
+#'       <td class=\"playerLink\"><a href=\"https://example.com/player2\">Profile 2</a></td>
+#'       <td class=\"team\">A</td>
+#'       <td class=\"teamLink\">No Team</td>
 #'     </tr>
 #'     <tr>
-#'       <td class="player">Player 3</td>
-#'       <td class="playerLink">Missing Profile 3</td>
+#'       <td class=\"player\">Player 3</td>
+#'       <td class=\"playerLink\">Missing Profile 3</td>
+#'       <td class=\"team\">B</td>
+#'       <td class=\"teamLink\"><a href=\"https://example.com/teamB\">Team B</a></td>
 #'     </tr>
+#'
 #'   </table>") %>% rvest::html_node("table")
 #'
 #'
 #' html_table_with_links(test_html_table)
 #'
 #' The result should be a data frame:
-#'   player  | playerLink_text      | playerLink_url
-#'   Player 1| Profile 1 | https://example.com/player1
-#'   Player 2| Profile 2 | https://example.com/player2
-#'   Player 3| Missing Profile 3 | NA
+#'   player   | player_link       | team | team_link | playerLink_url              | teamLink_url
+#'   Player 1 | Profile 1         | A    | Team A    | https://example.com/player1 | https://example.com/teamA
+#'   Player 2 | Profile 2         | A    | No Team   | https://example.com/player2 | NA
+#'   Player 3 | Missing Profile 3 | B    | Team B    | NA                          | https://example.com/teamB
 #'
 #' @export
-html_table_with_links <- function(html_table) {
-  extract_link_data <- function(cell) {
-    link <- rvest::html_node(cell, "a")
-    if (!is.null(link)) {
-      list(text = rvest::html_text(link), url = rvest::html_attr(link, "href"))
-    } else {
-      list(text = rvest::html_text(cell), url = NA_character_)
-    }
-  }
+html_table_with_links <- function(html_table, na_strings = "NA") {
 
-  process_row_new <- function(row) {
+  process_row <- function(row) {
     cells <- rvest::html_nodes(row, "td")
     link_cells <- purrr::keep(cells, ~length(rvest::html_nodes(.x, "a")) > 0)
 
@@ -113,6 +113,7 @@ html_table_with_links <- function(html_table) {
     }
 
     link_cell_urls <- purrr::map(link_cells, ~rvest::html_attr(rvest::html_node(.x, "a"), "href"))
+
     link_cell_names <- paste0(rvest::html_attr(link_cells, "class"), "_url")
 
     urls <- setNames(link_cell_urls, link_cell_names)
@@ -124,9 +125,9 @@ html_table_with_links <- function(html_table) {
   table_nodes <- rvest::html_nodes(html_table, "tr")[-1]
 
   html_table |>
-    rvest::html_table() |>
+    rvest::html_table(na.strings = na_strings) |>
     tibble::as_tibble(.name_repair = janitor::make_clean_names) |>
-    dplyr::mutate(parsed_row = purrr::map(table_nodes, process_row_new)) |>
+    dplyr::mutate(parsed_row = purrr::map(table_nodes, process_row)) |>
     tidyr::unnest_wider(parsed_row)
 }
 
