@@ -54,17 +54,6 @@ get_drafts <- function(draft_type = "nhl entry draft",
 
   mydata <- tidyr::crossing(draft_types, draft_years)
 
-  # if (progress) {
-
-  #   pb <- progress::progress_bar$new(format = "get_drafts() [:bar] :percent ETA: :eta",
-  #                                    clear = FALSE, total = nrow(mydata), show_after = 0)
-
-  #   cat("\n")
-
-  #   pb$tick(0)
-
-  # }
-
   fetch_draft_insist <- purrr::insistently(fetch_draft, rate = purrr::rate_delay(pause = 0.1, max_times = 10))
 
   .get_draft <- function(draft_type, draft_year, ...) {
@@ -115,10 +104,7 @@ get_drafts <- function(draft_type = "nhl entry draft",
 #' @import dplyr
 #'
 fetch_draft <- function(draft_type, draft_year, ...) {
-
-  # seq(7, 11, by = 0.001) %>%
-  #   sample(1) %>%
-  #   Sys.sleep()
+  # TODO: add delays
 
   page <- stringr::str_c("https://www.eliteprospects.com/draft/", draft_type, "/", draft_year) %>% xml2::read_html()
 
@@ -141,12 +127,20 @@ fetch_draft <- function(draft_type, draft_year, ...) {
     dplyr::mutate_all(stringr::str_squish) %>%
     dplyr::rename(round = round, pick_number = value)
 
+  # TODO: I hate this do it normally
   draft_team <- page %>%
     rvest::html_nodes(".team a") %>%
     rvest::html_text() %>%
     stringr::str_squish() %>%
     tibble::as_tibble() %>%
     purrr::set_names("draft_team")
+
+  draft_team_url <- page %>%
+    rvest::html_nodes(".team a") %>%
+    rvest::html_attr("href") %>%
+    stringr::str_squish() %>%
+    tibble::as_tibble() %>%
+    purrr::set_names("draft_team_url")
 
   player_info <- page %>%
     rvest::html_nodes("#drafted-players .txt-blue a") %>%
@@ -178,6 +172,7 @@ fetch_draft <- function(draft_type, draft_year, ...) {
 
   everything_w_no_selection_info <- draft_pick_info %>%
     dplyr::bind_cols(draft_team) %>%
+    dplyr::bind_cols(draft_team_url) %>%
     dplyr::anti_join(no_selection_info, by = c("pick_number" = "pick_number", "round" = "round")) %>%
     dplyr::bind_cols(player_info) %>%
     dplyr::bind_cols(player_url)
@@ -189,12 +184,12 @@ fetch_draft <- function(draft_type, draft_year, ...) {
     dplyr::mutate_at(dplyr::vars(pick_number, round), as.numeric) %>%
     dplyr::select(-c(value)) %>%
     dplyr::select(draft_league, draft_year, pick_number, round, draft_team,
-                  name, position, ep_player_url = player_url) %>%
+                  name, position, ep_player_url = player_url, ep_team_url = draft_team_url) %>%
     dplyr::arrange(pick_number)
 
-  # if (progress) {
-  #   pb$tick()
-  # }
+  all_data <- all_data %>%
+    dplyr::mutate(ep_player_id = stringr::str_extract(ep_player_url, "(?<=player/)[0-9]+"),
+                  ep_team_id = stringr::str_extract(ep_team_url, "(?<=team/)[0-9]+"))
 
   return(all_data)
 }
