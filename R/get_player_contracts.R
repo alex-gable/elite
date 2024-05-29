@@ -5,7 +5,8 @@ get_player_contracts <- function(ep_player_id, ...) { #nolint
   player_contract_table <- get_player_contract_table(player_contract_page)
 
   player_contracts <- player_contract_table %>%
-    dplyr::mutate(ep_player_id = ep_player_id)
+    dplyr::mutate(ep_player_id = ep_player_id) %>%
+    dplyr::mutate(season = as_numeric_quietly(stringr::str_split_i(season_slug, "-", 1)))
 
   return(player_contracts)
 }
