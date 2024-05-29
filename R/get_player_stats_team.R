@@ -95,7 +95,8 @@ fetch_player_stats_team <- function(team, ep_team_url, league, season, ep_team_i
     dplyr::select(!starts_with("ep_"), ep_player_id, ep_player_slug, ep_player_url) %>%
     dplyr::mutate(team = team,
                   season = season,
-                  ep_team_url = ep_team_url) %>%
+                  ep_team_url = ep_team_url,
+                  ep_team_id = ep_team_id) %>%
     dplyr::mutate(dplyr::across(games_played:save_percentage_playoffs, as_numeric_quietly)) %>%
     dplyr::select(name, team, league, season, dplyr::everything())
 

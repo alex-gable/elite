@@ -310,7 +310,8 @@ parse_individual_skater_stats <- function(skater_stats_table) {
       saves_playoffs,
       shutouts_playoffs,
       record_playoffs,
-      time_on_ice_playoffs
+      time_on_ice_playoffs,
+      ep_team_id
     )
 
   return(skater_stats_parsed)
@@ -356,7 +357,8 @@ parse_individual_goalie_stats <- function(goalie_stats_table) {
       saves_playoffs = postseason_svs,
       shutouts_playoffs = postseason_so,
       record_playoffs = postseason_wlt,
-      time_on_ice_playoffs = postseason_toi
+      time_on_ice_playoffs = postseason_toi,
+      ep_team_id
     )
 
   return(goalie_stats_parsed)
